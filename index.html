@@ -1489,7 +1489,8 @@ intervalHandle=setInterval(_=>{
 	renderDisplay(emulator)
 	document.body.style.backgroundColor = emulator.st?emulator.buzzColor:emulator.quietColor
 }, frameTime)
-injectAdaptiveControls(emulator.touchInputMode,document.getElementById('target'),ku,kd)
+injectAdaptiveControls(emulator.touchInputMode,document.body,ku,kd)
 </script>
 </head>
+<style>body { min-height: 100vh; }</style>
 </html>

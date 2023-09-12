@@ -1,0 +1,372 @@
+:const FPS 10
+:calc DELAY { ( 1 / FPS ) * 60 }
+
+
+:const UP 1
+:const DN 2
+:const R  3
+:const L  4
+
+
+# Variables
+:alias tx v3
+:alias ty v4
+
+:alias tmp v5
+:alias length v6
+
+:alias dir v7 # UP R L DN
+
+:alias apple_x v8
+:alias apple_y v9
+:alias head_x vA
+:alias head_y vB
+
+# actually directly behind!
+:alias tail_x vC
+:alias tail_y vD
+
+:alias FLAG vF
+
+: score
+	plane 2
+	v0 := length
+	v0 -= 1
+	i  := digits   # the destination for bcd
+	bcd v0        # unpack digits in v0
+
+	tx := 52       # x position of first digit
+	ty := 26       # y position of first digit
+	load v2        # load digits into v0-v2
+
+	i := hex v0    # hundreds digit
+	if v0 != 0 then sprite tx ty 5
+	tx += 4
+
+	i := hex v1    # tens digit
+	if v1 != 0 then sprite tx ty 5
+	tx += 4
+
+	i := hex v2    # ones digit
+	sprite tx ty 5
+	return
+
+
+: game_over
+  sync
+	tmp := 5
+	
+	plane 1
+	i := g1
+	v0 := 14
+	v1 := 7
+	sprite v0 v1 5
+	i += tmp
+	v0 += 8
+	sprite v0 v1 5
+	i += tmp
+	v0 += 8
+	sprite v0 v1 5
+	i += tmp
+	v0 := 27
+	v1 := 13
+	sprite v0 v1 5
+	i += tmp
+	v0 += 8
+	sprite v0 v1 5
+	i += tmp
+	v0 += 8
+	sprite v0 v1 5
+	
+	plane 2
+	i := g1
+	v0 := 14
+	v1 := 7
+	sprite v0 v1 5
+	i += tmp
+	v0 += 8
+	sprite v0 v1 5
+	i += tmp
+	v0 += 8
+	sprite v0 v1 5
+	i += tmp
+	v0 := 27
+	v1 := 13
+	sprite v0 v1 5
+	i += tmp
+	v0 += 8
+	sprite v0 v1 5
+	i += tmp
+	v0 += 8
+	sprite v0 v1 5
+
+	sync sync sync sync
+	tmp := key
+	jump game
+
+: error
+	tx :=  1       # x position of first digit
+	ty := 26       # y position of first digit
+	i := err
+	plane 1 sprite tx ty 5
+	plane 2 sprite tx ty 5
+	game_over
+
+
+: put_head
+	i := dot
+	plane 1 sprite head_x head_y 3
+	# check collision
+	if FLAG != 1 then return
+	plane 1 sprite head_x head_y 3
+	game_over
+	return
+
+: erase_tail_up
+	tail_y -= 1
+	jump put_head
+: erase_tail_dn
+	tail_y += 1
+	jump put_head
+: erase_tail_r
+	tail_x += 1
+	jump put_head
+: erase_tail_l
+	tail_x -= 1
+	jump put_head
+
+: erase_tail
+  # :breakpoint eraser
+	# try up
+	i := up
+	plane 1 sprite tail_x tail_y 3
+	if FLAG == 1 then jump erase_tail_up
+	plane 1 sprite tail_x tail_y 3
+	# try down
+	i := dn
+	plane 1 sprite tail_x tail_y 3
+	if FLAG == 1 then jump erase_tail_dn
+	plane 1 sprite tail_x tail_y 3
+	# try right
+	i := rt
+	plane 1 sprite tail_x tail_y 3
+	if FLAG == 1 then jump erase_tail_r
+	plane 1 sprite tail_x tail_y 3
+	# try left
+	i := lt
+	plane 1 sprite tail_x tail_y 3
+	if FLAG == 1 then jump erase_tail_l
+	plane 1 sprite tail_x tail_y 3
+	jump error
+
+
+: move
+  tmp := 63
+	head_x &= tmp
+	tmp := 31
+	head_y &= tmp
+	# check apple
+	if head_x != apple_x then jump erase_tail
+	if head_y != apple_y then jump erase_tail
+	# eat apple
+	plane 2 sprite apple_x apple_y 3 # move to apple-plane
+	put_head
+	if length != 1 then score
+	length += 1
+	score
+	place_apple
+	return
+
+: move_up
+	head_y -= 1
+	jump move
+: move_dn
+	head_y += 1
+	jump move
+: move_r
+	head_x += 1
+	jump move
+: move_l
+	head_x -= 1
+	jump move
+
+: place_apple
+	i := dot
+	apple_x := random 31 # screen width / 2
+	apple_y := random 15 # screen height / 2
+	apple_x <<= apple_x
+	apple_y <<= apple_y
+	plane 1 sprite apple_x apple_y 3 # draw in snake-plane
+	tmp := vF
+	plane 1 sprite apple_x apple_y 3 # un-erase snake / remove from snake-p.
+	if tmp == 1 then jump place_apple
+	plane 2 sprite apple_x apple_y 3 # move to apple-plane
+	return
+	
+: listen_up
+	  tmp := OCTO_KEY_W
+		if tmp key then dir := UP
+		return
+: listen_dn
+	  tmp := OCTO_KEY_S
+		if tmp key then dir := DN
+		return
+: listen_r
+	  tmp := OCTO_KEY_D
+		if tmp key then dir := R
+		return
+: listen_l
+	  tmp := OCTO_KEY_A
+		if tmp key then dir := L
+		return
+
+: sync
+	v0 := dir
+	loop
+		if v0 != DN then listen_up
+		if v0 != UP then listen_dn
+		if v0 != L  then listen_r
+		if v0 != R  then listen_l
+		vf := delay
+		if vf != 0 then
+	again
+
+	# delay for up to DELAY/60th of a second = FPS
+	# using the fixed-rate delay timer
+	vf := DELAY
+	delay := vf
+;
+
+: intro
+	plane 3 clear
+	tmp := 5
+	
+	plane 1
+	i := logo
+	tx := 13
+	ty := 6
+	sprite tx ty 9
+	i := tail
+	tx := 10
+	ty := 15
+	sprite tx ty 3
+	i := l1
+	tx := 20
+	ty := 7
+	sprite tx ty 5
+	i += tmp
+	tx += 8
+	sprite tx ty 5
+	i += tmp
+	tx += 8
+	sprite tx ty 5
+	i += tmp
+	tx += 8
+	sprite tx ty 5
+	
+	plane 2
+	i := dot
+	tx := 17
+	ty := 6
+	sprite tx ty 3
+	i := l1
+	tx := 20
+	ty := 7
+	sprite tx ty 5
+	i += tmp
+	tx += 8
+	sprite tx ty 5
+	i += tmp
+	tx += 8
+	sprite tx ty 5
+	i += tmp
+	tx += 8
+	sprite tx ty 5
+
+	tmp := key
+	# continues
+
+: game
+	plane 3 clear
+	i := init_data
+	load v6 - vD
+	
+	i := dot
+	plane 1 sprite head_x head_y 3
+
+	place_apple
+
+	loop
+		# move (twice so tail works)
+		if dir == UP then move_up
+		if dir == DN then move_dn
+		if dir == R  then move_r
+		if dir == L  then move_l
+		if dir == L  then move_l
+		if dir == R  then move_r
+		if dir == DN then move_dn
+		if dir == UP then move_up
+		
+		# DEBUG GOTO
+	  # tmp := OCTO_KEY_1 if tmp key then jump error
+		
+		# wait for input or timer/frame
+		sync
+	again
+
+: main
+
+	:monitor head_x  "HEAD:  x:%1i y:%1i"
+	:monitor apple_x "APPLE: x:%1i y:%1i"
+	:monitor tail_x  "TAIL:  x:%1i y:%1i"
+
+	intro
+
+
+: init_data
+# v6   v7   v8   v9   vA   vB   vC   vD
+  0x01 0x03 0x00 0x00 0x04 0x04 0x03 0x04
+
+# coordinates offset by one (3x3)
+: dot 0x00 0x40 0x00
+: up  0x40 0x00 0x00
+: dn  0x00 0x00 0x40
+: rt  0x00 0x20 0x00
+: lt  0x00 0x80 0x00
+
+# SNAKE LOGO
+: logo 0x78 0xC0 0xC0 0xC0 0xC0 0x78 0x04 0x04 0x08
+: tail 0x7E 0xC0 0xC0 0x8
+: l1 0x64 0xD5 0xD5 0xD5 0xCD
+: l2 0xE2 0x96 0xF7 0x96 0x96
+: l3 0x0F 0x58 0x9E 0x58 0x5F
+: l4 0x20 0x60 0x60 0x00 0x60
+
+# GAME OVER TEXT
+# GAME:
+: g1 0x71 0xC3 0xDB 0xCB 0x73
+: g2 0xC6 0x2D 0xED 0x2D 0x2C
+: g3 0x8F 0x58 0x5E 0x58 0x5F
+# OVER:
+: o1 0x73 0xCB 0xCB 0xCB 0x71
+: o2 0x27 0x2C 0x2F 0x4C 0x8F
+: o3 0x9C 0x32 0x3C 0x32 0xB2
+
+: err 0xC0 0x80 0xDB 0x92 0xD2
+
+: digits 0 0 0 # placeholder space for score display
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
